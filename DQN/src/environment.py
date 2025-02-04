@@ -2,12 +2,6 @@ import numpy as np
 import random
 
 
-# from db_connection import SalesDatabase
-# from utils import prepare_rl_dataset_new
-
-# df = SalesDatabase().get_historical_sales_data()
-# data = prepare_rl_dataset_new(df)
-
 # Define the Sales Environment for Reinforcement Learning
 class SalesEnvironment:
     def __init__(self, df):
@@ -144,13 +138,3 @@ class SalesEnvironment:
         """ Retrieves a single state from the dataset based on index. """
         self.current_state = self.states.iloc[index].to_dict()
         return (self.current_state)
-
-
-
-
-
-
-
-
-# ex = SalesEnvironment(data)
-# print(ex.reset())
