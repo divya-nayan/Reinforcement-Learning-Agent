@@ -2,11 +2,6 @@ import numpy as np
 from src.environment import SalesEnvironment
 from src.agent import DQNAgent
 
-# from db_connection import SalesDatabase
-# from utils import prepare_rl_dataset
-# data = SalesDatabase().get_historical_sales_data()
-# df = prepare_rl_dataset(data)
-
 class DQNTrainer:
     
     def __init__(self, df, episodes, batch_size=32, max_steps=50):
