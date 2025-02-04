@@ -1,10 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
-# from db_connection import SalesDatabase
-# sales_db = SalesDatabase()  # No need to pass any parameters
-# df = sales_db.get_historical_sales_data()
-
 
 
 def prepare_rl_dataset(df):
