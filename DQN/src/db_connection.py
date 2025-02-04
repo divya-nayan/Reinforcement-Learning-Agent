@@ -9,11 +9,11 @@ pd.set_option('display.max_rows', None)
 class SalesDatabase:
     def __init__(self):
         # Define the connection parameters directly inside the class
-        self.server = '20.46.47.104'
-        self.database = 'YaumiAIML'
-        self.username = 'sandeep'
-        self.password = 'Winit$1234'
-        self.port = '1433'
+        self.server = '*********'
+        self.database = '********'
+        self.username = '*********'
+        self.password = '********'
+        self.port = '******'
         self.driver = '{ODBC Driver 17 for SQL Server}'
         self.sql_query_path = r"sql_files\sql.sql"
         self.connection = None
