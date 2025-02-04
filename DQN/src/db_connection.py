@@ -7,15 +7,15 @@ pd.set_option('display.max_rows', None)
 #Class dedicated to established connection to database and fetch relevant data using targeted sql query.
 
 class SalesDatabase:
-    def __init__(self):
+    def __init__(self, server, database, username, password, port, sql_filepath):
         # Define the connection parameters directly inside the class
-        self.server = '*********'
-        self.database = '********'
-        self.username = '*********'
-        self.password = '********'
-        self.port = '******'
+        self.server = server
+        self.database = database
+        self.username = username
+        self.password = password
+        self.port = port
         self.driver = '{ODBC Driver 17 for SQL Server}'
-        self.sql_query_path = r"sql_files\sql.sql"
+        self.sql_query_path = sql_filepath
         self.connection = None
 
     def connect(self):
@@ -38,7 +38,7 @@ class SalesDatabase:
 
 
 # # Usage:
-# sales_db = SalesDatabase()  # No need to pass any parameters
+# sales_db = SalesDatabase(server, database, username, password, port, sql_filepath)  # No need to pass any parameters
 # df = sales_db.get_historical_sales_data()
 # print(df.shape)
 # print(df.head())
