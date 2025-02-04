@@ -11,7 +11,7 @@ from src.utils import prepare_rl_dataset_new
 if __name__ == "__main__":
 
     # Load the dataset (replace with actual file path)
-    data = SalesDatabase().get_historical_sales_data()
+    data = SalesDatabase().get_historical_sales_data(server, database, username, password, port, sql_filepath)
     standardized_data = prepare_rl_dataset_new(data)
     
     df_sorted = standardized_data.sort_values(by=['Year', 'Month', 'Day'])  # Sort by date
