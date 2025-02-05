@@ -7,7 +7,7 @@ from src.evaluation import DQNAgentEvaluator
 from src.training import DQNTrainer
 from src.utils import prepare_rl_dataset_new
 
-#import these parametes as per your convenience.
+#import these parameters as per your convenience.
 server = server
 database = database
 username = username
