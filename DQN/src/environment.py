@@ -1,140 +1,149 @@
 import numpy as np
 import random
 
-
-# Define the Sales Environment for Reinforcement Learning
 class SalesEnvironment:
     def __init__(self, df):
         """
         Reinforcement Learning environment for sales optimization.
         """
         self.states = df
-        self.max_sales = 1000  # Prevent division by zero
-        self.max_demand = df['ActualQuantitySold'].max() + 1e-8
         self.state_space = self.states.iloc[0]
-        self.action_space = [0, 1, 2, 3, 4, 5, 6, 7, 8]  # Actions: [no change, 5%-20% increment/decrement]
-        self.history_length = 7  # Rolling window for trends
+        # Actions: [no change, 5%-20% increment/decrement]
+        self.action_space = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        self.history_length = 30  # Rolling window for trends
 
-        # Initialize tracking lists for early stopping
+        # Tracking lists for early stopping criteria
         self.recent_rewards = []
         self.recent_actions = []
 
     def reset(self):
-        """ Resets the environment and returns the initial state. """
+        """Resets the environment and returns the initial state."""
+        self.recent_rewards = []
+        self.recent_actions = []
         self.current_index = np.random.randint(0, len(self.states) - self.history_length)
         self.current_state = self.get_state(self.current_index)
         return np.array(self.current_state)
 
     def step(self, action):
         """
-        Executes an action, updates state, and calculates reward.
+        Executes an action, updates the state, and calculates reward.
+        Here, the reward is based solely on the improvement (or deterioration)
+        in the rolling averages.
         """
+        # Get the current state as a dictionary
         state = self.get_state(self.current_index)
-        # Convert dictionary values to a tuple
+        # Convert dictionary values to a tuple (ensure a consistent ordering)
         state_tuple = tuple(state.values())
 
-        # Unpack state variables
-        (Day, Month, Year, WeekDay, RouteCode, ItemCode, ActualQuantitySold,
-        PredictedQuantity, UnitPrice, SalesRollingAvg, BadReturnRollingAvg, ActualQuantityRollingAvg) = state_tuple
+        # Unpack state variables (order must be consistent with your data)
+        (Day_sin, Day_cos, Month_sin, Month_cos, Year_sin, Year_cos,
+         WeekDay_sin, Weekday_cos, RouteCode, ItemCode, ActualQuantitySold,
+         PredictedQuantity, UnitPrice, SalesRollingAvg, TotalReturnRollingAvg,
+         ActualQuantityRollingAvg) = state_tuple
 
-        # Action adjustment factors
-        adjustment_factors = {0: 0, 1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20,  
-                               5: -0.05, 6: -0.10, 7: -0.15, 8: -0.20}
+        # Define action adjustment factors:
+        # 0: no change, 1-4: positive adjustments, 5-8: negative adjustments.
+        adjustment_factors = {
+            0: 0, 1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20,
+            5: -0.05, 6: -0.10, 7: -0.15, 8: -0.20
+        }
         adjustment_percentage = adjustment_factors[action]
-
-        # Adjust predicted quantity
+        # Adjust predicted quantity based on action
         adjusted_predicted_quantity = max(0, PredictedQuantity * (1 + adjustment_percentage))
 
-        # Simulate demand variation (market fluctuation)
-        demand_variation = np.random.normal(loc=0, scale=0.1 * ActualQuantitySold)
-        new_actual_quantity_sold = max(0, ActualQuantitySold + demand_variation)
 
-        # Compute sales and bad return values
-        total_sales_value = min(adjusted_predicted_quantity, new_actual_quantity_sold) * UnitPrice
-        total_bad_return_value = max(0, adjusted_predicted_quantity - new_actual_quantity_sold) * UnitPrice
+        # Compute immediate values (which we won’t use directly in the reward)
+        total_sales_value = min(adjusted_predicted_quantity, ActualQuantitySold) * UnitPrice
+        total_return_value = max(0, adjusted_predicted_quantity - ActualQuantitySold) * UnitPrice
 
-        # Update rolling averages using exponential moving average
-        alpha = 2 / (self.history_length + 1)  # Smoothing factor
+        # Update rolling averages using an exponential moving average
+        alpha = 2 / (self.history_length + 1)
         new_sales_rolling_avg = alpha * total_sales_value + (1 - alpha) * SalesRollingAvg
-        new_bad_return_rolling_avg = alpha * total_bad_return_value + (1 - alpha) * BadReturnRollingAvg
-        new_actual_quantity_rolling_avg = alpha * new_actual_quantity_sold + (1 - alpha) * ActualQuantityRollingAvg
-
-        # Prepare next state
+        new_total_return_rolling_avg = alpha * total_return_value + (1 - alpha) * TotalReturnRollingAvg
+        
+        # Build the next state as a dictionary and then convert to numpy array
         next_state = {
-            'Day': Day,
-            'Month': Month,
-            'Year': Year,
-            'WeekDay': WeekDay,
+            'Day_sin': Day_sin,
+            'Day_cos': Day_cos,
+            'Month_sin': Month_sin,
+            'Month_cos': Month_cos,
+            'Year_sin': Year_sin,
+            'Year_cos': Year_cos,
+            'WeekDay_sin': WeekDay_sin,
+            'WeekDay_cos': Weekday_cos,
             'RouteCode': RouteCode,
             'ItemCode': ItemCode,
             'ActualQuantitySold': ActualQuantitySold,
             'PredictedQuantity': adjusted_predicted_quantity,
             'UnitPrice': UnitPrice,
             'SalesRollingAvg': new_sales_rolling_avg,
-            'BadReturnRollingAvg': new_bad_return_rolling_avg,
-            'ActualQuantityRollingAvg': new_actual_quantity_rolling_avg
+            'TotalReturnRollingAvg': new_total_return_rolling_avg,
+            'ActualQuantityRollingAvg': ActualQuantityRollingAvg
         }
         next_state = np.array(next_state)
 
-        # Compute reward
-        reward = self.calculate_reward(total_bad_return_value, total_sales_value, 
-                                       new_actual_quantity_sold, adjusted_predicted_quantity)
+        # Calculate the reward based solely on improvements in rolling metrics
+        reward = self.calculate_reward(
+            SalesRollingAvg, new_sales_rolling_avg,
+            TotalReturnRollingAvg, new_total_return_rolling_avg,
+            ActualQuantitySold, adjusted_predicted_quantity
+        )
 
-
-        # Check early stopping criteria
+        # Record the action and reward for early stopping checks
+        self.recent_actions.append(action)
+        self.recent_rewards.append(reward)
         done = self.should_stop_early()
 
         return next_state, reward, done
 
-    def calculate_reward(self, total_bad_return_value, total_sales_value, actual_sold, predicted_quantity):
+    def calculate_reward(self, old_sales, new_sales,
+                        old_return, new_return,
+                        actual_quantity, adjusted_prediction):
         """
-        Reward function that:
-        - Maximizes sales value
-        - Minimizes waste (bad returns)
-        - Encourages accurate predictions
+        Calculates reward based on the change in rolling averages.
+          - An increase in SalesRollingAvg is rewarded.
+          - A decrease in BadReturnRollingAvg is rewarded.
+          - Changes in ActualQuantityRollingAvg can be rewarded (or penalized)
+            based on your specific business objectives.
         """
-        profit = total_sales_value - total_bad_return_value
-        waste_ratio = total_bad_return_value / (total_sales_value + total_bad_return_value + 1e-8)
-        accuracy_bonus = 1.0 - waste_ratio  # 1 when no waste, 0 when high waste
-        demand_supply_balance = 1 - abs(predicted_quantity - actual_sold) / (actual_sold + 1e-8)
+        # Compute the improvements.
+        delta_sales = new_sales - old_sales
+        delta_returns = old_return - new_return
+        delta_gap = adjusted_prediction - actual_quantity
 
-        reward = (
-            0.6 * (profit / self.max_sales) +  # Encourage high profit
-            0.3 * accuracy_bonus +             # Encourage minimal waste
-            0.1 * demand_supply_balance        # Encourage balanced predictions
-        )
+        # Weight the improvements (tune these weights as needed).
+        reward = (1 * delta_sales) + (0.5 * delta_returns) + (0.2 * delta_gap)
 
-        # Penalize drastic changes in predicted sales
-        change_penalty = abs(predicted_quantity - actual_sold) / (actual_sold + 1e-8)
-        reward -= 0.1 * change_penalty  # Penalty for erratic predictions
-
-        return np.clip(reward, -2, 2)  # Clip the reward to the range [-2, 2] 
+        return reward
 
     def should_stop_early(self):
         """
         Early stopping condition to prevent unnecessary training if:
-        - Reward is stable
-        - Actions are converging
-        - Minimal state change is observed
+          - Recent rewards are stable or optimal.
+          - Recent actions have converged.
         """
-        if len(self.recent_rewards) > 50:
-            avg_reward = np.mean(self.recent_rewards[-50:])
-            reward_variation = np.std(self.recent_rewards[-50:])
-            
-            if avg_reward > 1.8:  # If reward is already optimal
+        if len(self.recent_rewards) > 30:
+            avg_reward = np.mean(self.recent_rewards[-25:])
+            reward_variation = np.std(self.recent_rewards[-25:])
+            reward_90_percentile = np.percentile(self.recent_rewards[-25:], 90)
+            if avg_reward >= reward_90_percentile:
                 return True
-            
-            if reward_variation < 0.05:  # If reward has stabilized
+            if reward_variation < max(0.05 * abs(avg_reward), 0.01):
                 return True
-        
-        if len(self.recent_actions) > 50:
-            # Check for convergence in recent actions
-            if np.mean(np.array(self.recent_actions[-10:]) == self.recent_actions[-1]) > 0.8:
-                return True  # Actions are repeating, indicating convergence
-        
-        return False  # Continue training
+
+        if len(self.recent_actions) > 30:
+            if len(set(self.recent_actions[-8:])) == 1:
+                return True
+
+        return False
 
     def get_state(self, index):
-        """ Retrieves a single state from the dataset based on index. """
+        """Retrieves a single state from the dataset based on the given index."""
         self.current_state = self.states.iloc[index].to_dict()
-        return (self.current_state)
+        return self.current_state
+
+# Example usage:
+# ex = SalesEnvironment(data)
+# state = ex.reset()
+# next_state, reward, done = ex.step(3)
+# print(next_state, reward, done)
